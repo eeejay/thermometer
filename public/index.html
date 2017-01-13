@@ -1,0 +1,102 @@
+<html>
+  <head>
+    <link rel="stylesheet" href="//cdn.jsdelivr.net/chartist.js/latest/chartist.min.css">
+    <script src="//cdn.jsdelivr.net/chartist.js/latest/chartist.min.js"></script>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/fetch/2.0.1/fetch.min.js"></script>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/moment.js/2.17.1/moment.min.js"></script>
+    <style>
+      h1 {
+        text-align: center;
+        min-height: 1em;
+      }
+
+      .ct-label.ct-horizontal {
+        white-space: nowrap;
+        transform: translate(-50%, .5rem) rotate(-45deg);
+        display: inline-block;
+        width: auto !important;
+      }
+    </style>
+  </head>
+  <body>
+    <h1 id="temp">Loading..</h1>
+    <div style="height: 400px; width: 100%; margin: auto;">
+      <div class="ct-chart"></div>
+    </div>
+    <script>
+    // Our labels and three data series
+
+    // We are setting a few options for our chart and override the defaults
+    var options = {
+      // Don't draw the line chart points
+      showPoint: false,
+      // Disable line smoothing
+      lineSmooth: Chartist.Interpolation.monotoneCubic({
+    tension: 0.2
+  }),
+      // X-Axis specific configuration
+      axisX: {
+        // We can disable the grid for this axis
+        showGrid: true,
+        labelInterpolationFnc: function (value, index) {
+          let d = moment(value);
+          if (d.minutes() == 0) {
+            return d.format("h a");
+          }
+          return null;
+        }
+      },
+      // Y-Axis specific configuration
+      axisY: {
+        // Lets offset the chart a bit from the labels
+        offset: 60,
+        // The label interpolation function enables you to modify the values
+        // used for the labels on each axis. Here we are converting the
+        // values into million pound.
+        labelInterpolationFnc: function(value) {
+          return value + '°F';
+        }
+      }
+    };
+
+    function labelMaker () {
+      let labels = [];
+      let m = moment().startOf('day').add(12, 'hours').subtract(5, 'minutes');
+      let to = m.clone().add(1, 'day');
+      while (m.isBefore(to)) {
+        labels.push(Number(m.add(5, "minutes")));
+      }
+      return labels;
+    }
+
+    fetch("/history").then(result => result.json()).then(history => {
+      var h = history.reverse().map(s => [s[0], s[1]  * 9 / 5 + 32]);
+      let series = [];
+      let labels = labelMaker();
+
+      let m = moment(h[0][0]);
+      while (m.hours() != 12 || m.minutes() != 0) {
+        h.unshift([Number(m.subtract(5, "minutes")), null]);
+      }
+      while (h.length) {
+        let segment = h.splice(0, 288);
+        series.unshift(segment.map(s => s[1]));
+      }
+      var data = { labels, series };
+
+      console.log(data);
+      new Chartist.Line('.ct-chart', data, options);
+    });
+
+    function updateTemp() {
+      fetch("/now").then(result => result.json()).then(temp => {
+        let f = temp * 9 / 5 + 32;
+        document.getElementById("temp").textContent = `${f.toFixed(2)}°F`
+      });
+    }
+
+    updateTemp();
+
+    </script>
+  </body>
+</html>
